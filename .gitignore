@@ -2,3 +2,4 @@
 /traffic-signs-data.zip
 .ipynb_checkpoints
 .vscode
+__pycache__

@@ -2,6 +2,7 @@
 import pickle
 import csv
 import glob
+import os
 
 from tqdm import *
 import matplotlib.pyplot as plt
@@ -58,21 +59,85 @@ BATCH_SIZE = 100
 rate = 0.0009
 
 def placeholder():
-    x = tf.placeholder(tf.float32, (None, 32, 32, 1), name='input')
-    y = tf.placeholder(tf.int32, (None), name='labels')
-    keep_prob = tf.placeholder(tf.float32, name='keep_prob') # probability to keep units
+    x = tf.placeholder(tf.float32, shape=(None, 32, 32, 1), name='input')
+    y = tf.placeholder(tf.int32, shape=(None), name='labels')
+    keep_prob = tf.placeholder(tf.float32, shape=None,name='keep_prob') # probability to keep units
     one_hot_y = tf.one_hot(y, 43, name='one_hot_labels')
     return x, y, keep_prob, one_hot_y
 
 def main_optimizer(logits, one_hot_y):
-    cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=one_hot_y, logits=logits)
-    loss_operation = tf.reduce_mean(cross_entropy)
-    train_op = tf.train.AdamOptimizer(learning_rate = rate).minimize(loss_operation)
-    return train_op
+    # Calculating Loss
+    tf_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=one_hot_y, logits=logits),name='loss')
 
-def main_train():
+    # Optimizer
+    tf_loss_minimize = tf.train.AdamOptimizer(learning_rate = rate).minimize(tf_loss)    
+    tf_loss_summary = tf.summary.scalar('loss', tf_loss_minimize)
+    return tf_loss_minimize, tf_loss_summary
+
+def evaluate(X_data, y_data, ops):
+    total_accuracy = 0
+    sess = tf.get_default_session()
+    for offset in range(0, len(X_data), BATCH_SIZE):
+        batch_x, batch_y = X_data[offset:offset+BATCH_SIZE], y_data[offset:offset+BATCH_SIZE]
+        feed_dict = {ops['x']: batch_x, ops['y']: batch_y, ops['keep_prob']: 1.0}
+        accuracy = sess.run(ops['accuracy_operation'], feed_dict=feed_dict)
+        total_accuracy += (accuracy * len(batch_x))
+    return total_accuracy / len(X_data)
+
+def accuracy(logits, one_hot_y):
+    '''
+    Accuracy of a given set of predictions of size (N x n_classes) and
+    labels of size (N x n_classes)
+    '''
+    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(one_hot_y, 1))
+    accuracy_operation = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    return correct_prediction, accuracy_operation
+
+def main_train(X_train_normalize, y_train):
     tf.reset_default_graph()
 
     x, y, keep_prob, one_hot_y = placeholder()
     logits = LeNet2(x, keep_prob)
-    train_op = main_optimizer(logits, one_hot_y)
+    tf_loss_minimize, tf_loss_summary = main_optimizer(logits, one_hot_y)
+
+    correct_prediction, accuracy_operation = accuracy(logits, one_hot_y)
+    saver = tf.train.Saver()
+
+    merge = tf.summary.merge_all()
+
+    
+
+    ops = {
+        'x': x,
+        'y': y,
+        'keep_prob': keep_prob,
+        'one_hot_y': one_hot_y,
+        'logits': logits,
+        'tf_loss_minimize': tf_loss_minimize,
+        'correct_prediction': correct_prediction,
+        'accuracy_operation': accuracy_operation,
+        'merge': merge
+    }
+
+    with tf.Session() as sess:
+        summ_writer = tf.summary.FileWriter(os.path.join('log'), sess.graph)
+
+        sess.run(tf.global_variables_initializer())
+        
+        print("Training...\n")
+        for epoch in range(EPOCHS):
+            X_train_normalize, y_train = shuffle(X_train_normalize, y_train)
+            for offset in tqdm(range(0, len(X_train), BATCH_SIZE), ncols= 100, ascii = True, desc = ("EPOCH {} ".format(epoch+1))):
+                end = offset + BATCH_SIZE
+                batch_x, batch_y = X_train_normalize[offset:end], y_train[offset:end]
+                _, merge_i = sess.run([tf_loss_minimize, merge], feed_dict={x: batch_x, y: batch_y, keep_prob: 0.5})
+                summ_writer.add_summary(merge_i, epoch)
+                
+            validation_accuracy = evaluate(X_valid_normalize, y_valid, ops)
+            print("Validation Accuracy = {:.3f}".format(validation_accuracy))
+            
+        saver.save(sess, './lenet')
+        print("Model saved")
+
+if __name__ == "__main__":
+    main_train(X_train_normalize, y_train)
