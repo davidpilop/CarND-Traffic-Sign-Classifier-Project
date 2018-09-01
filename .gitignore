@@ -1,3 +1,4 @@
 /data
 /traffic-signs-data.zip
 .ipynb_checkpoints
+.vscode
