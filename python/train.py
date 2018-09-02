@@ -11,9 +11,7 @@ import matplotlib.image as mpimg
 import numpy as np
 import cv2
 import random
-
 from sklearn.utils import shuffle
-from sklearn.model_selection import train_test_split
 
 import tensorflow as tf
 
@@ -55,26 +53,26 @@ X_test_normalize = preprocess(X_test)
 
 
 EPOCHS = 60
-BATCH_SIZE = 100
+BATCH_SIZE = 2047
 rate = 0.0009
+num_classes = 43 # TODO: read signnames.csv
 
 def placeholder():
     x = tf.placeholder(tf.float32, shape=(None, 32, 32, 1), name='input')
-    y = tf.placeholder(tf.int32, shape=(None), name='labels')
-    keep_prob = tf.placeholder(tf.float32, shape=None,name='keep_prob') # probability to keep units
-    one_hot_y = tf.one_hot(y, 43, name='one_hot_labels')
+    y = tf.placeholder(tf.int32, shape=None, name='labels')
+    keep_prob = tf.placeholder(tf.float32, shape=None, name='keep_prob') # probability to keep units
+    one_hot_y = tf.one_hot(y, num_classes, name='one_hot_labels')
     return x, y, keep_prob, one_hot_y
 
 def main_optimizer(logits, one_hot_y):
     # Calculating Loss
     tf_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=one_hot_y, logits=logits),name='loss')
-
+    tf.summary.scalar('loss', tf_loss)
     # Optimizer
     tf_loss_minimize = tf.train.AdamOptimizer(learning_rate = rate).minimize(tf_loss)    
-    tf_loss_summary = tf.summary.scalar('loss', tf_loss_minimize)
-    return tf_loss_minimize, tf_loss_summary
+    return tf_loss_minimize
 
-def evaluate(X_data, y_data, ops):
+def evaluate_one_epoch(X_data, y_data, ops):
     total_accuracy = 0
     sess = tf.get_default_session()
     for offset in range(0, len(X_data), BATCH_SIZE):
@@ -89,23 +87,31 @@ def accuracy(logits, one_hot_y):
     Accuracy of a given set of predictions of size (N x n_classes) and
     labels of size (N x n_classes)
     '''
-    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(one_hot_y, 1))
-    accuracy_operation = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    return correct_prediction, accuracy_operation
+    correct_prediction = tf.cast(tf.equal(tf.argmax(logits, 1), tf.argmax(one_hot_y, 1)), tf.float32)
+    accuracy_operation = tf.reduce_mean(correct_prediction)
+    tf.summary.scalar('accuracy', accuracy_operation)
+    return accuracy_operation
+
+def train_one_epoch(sess, X_data, y_data, ops, epoch):
+    X_data, y_data = shuffle(X_data, y_data)
+    for offset in tqdm(range(0, len(X_data), BATCH_SIZE), ncols= 100, desc = ("EPOCH {} ".format(epoch+1))):
+        end = offset + BATCH_SIZE
+        batch_x, batch_y = X_data[offset:end], y_data[offset:end]
+        feed_dict={ops['x']: batch_x, ops['y']: batch_y, ops['keep_prob']: 0.5}
+        summary, _ = sess.run([ops['merge'], ops['tf_loss_minimize']], feed_dict=feed_dict)
+        return summary
 
 def main_train(X_train_normalize, y_train):
     tf.reset_default_graph()
-
+    
     x, y, keep_prob, one_hot_y = placeholder()
     logits = LeNet2(x, keep_prob)
-    tf_loss_minimize, tf_loss_summary = main_optimizer(logits, one_hot_y)
+    tf_loss_minimize = main_optimizer(logits, one_hot_y)
 
-    correct_prediction, accuracy_operation = accuracy(logits, one_hot_y)
+    accuracy_operation = accuracy(logits, one_hot_y)
     saver = tf.train.Saver()
 
     merge = tf.summary.merge_all()
-
-    
 
     ops = {
         'x': x,
@@ -114,30 +120,24 @@ def main_train(X_train_normalize, y_train):
         'one_hot_y': one_hot_y,
         'logits': logits,
         'tf_loss_minimize': tf_loss_minimize,
-        'correct_prediction': correct_prediction,
         'accuracy_operation': accuracy_operation,
-        'merge': merge
-    }
+        'merge': merge}
 
     with tf.Session() as sess:
         summ_writer = tf.summary.FileWriter(os.path.join('log'), sess.graph)
 
-        sess.run(tf.global_variables_initializer())
+        init = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
+        sess.run(init)
         
         print("Training...\n")
         for epoch in range(EPOCHS):
-            X_train_normalize, y_train = shuffle(X_train_normalize, y_train)
-            for offset in tqdm(range(0, len(X_train), BATCH_SIZE), ncols= 100, ascii = True, desc = ("EPOCH {} ".format(epoch+1))):
-                end = offset + BATCH_SIZE
-                batch_x, batch_y = X_train_normalize[offset:end], y_train[offset:end]
-                _, merge_i = sess.run([tf_loss_minimize, merge], feed_dict={x: batch_x, y: batch_y, keep_prob: 0.5})
-                summ_writer.add_summary(merge_i, epoch)
-                
-            validation_accuracy = evaluate(X_valid_normalize, y_valid, ops)
-            print("Validation Accuracy = {:.3f}".format(validation_accuracy))
+            summary = train_one_epoch(sess, X_train_normalize, y_train, ops, epoch)
+            summ_writer.add_summary(summary, epoch)                
+            validation_accuracy = evaluate_one_epoch(X_valid_normalize, y_valid, ops)
             
         saver.save(sess, './lenet')
         print("Model saved")
+        summ_writer.close()
 
 if __name__ == "__main__":
     main_train(X_train_normalize, y_train)
