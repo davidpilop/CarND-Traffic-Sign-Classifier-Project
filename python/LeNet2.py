@@ -40,7 +40,7 @@ def LeNet2(x, keep_prob=1.):
         
         # Flatten. Input = 5x5x16. Output = 400.
         fc0   = tf.contrib.layers.flatten(ppp)
-
+        
         # Flatten. Input = 5x5x16. Output = 400.
         fc1   = tf.contrib.layers.flatten(conv3)
         
