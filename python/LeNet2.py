@@ -10,7 +10,6 @@ def LeNet2(x, keep_prob=1.):
         conv1_W = tf.Variable(tf.truncated_normal(shape=(5, 5, 1, 6), mean = mu, stddev = sigma))
         conv1_b = tf.Variable(tf.zeros(6))
         conv1   = tf.nn.conv2d(x, conv1_W, strides=[1, 1, 1, 1], padding='VALID') + conv1_b
-        print("conv1 shape:",conv1.get_shape())
         
         # Activation.
         conv1 = tf.nn.elu(conv1)

@@ -12,7 +12,7 @@ import cv2
 import random
 
 # Visualizations
-def visualization(n_classes, X_train):
+def visualization(n_classes, X_train, y_train):
     plt.figure(figsize=(15, 15))
     for i in range(0, n_classes):
         plt.subplot(7, 7, i+1)
@@ -23,7 +23,7 @@ def visualization(n_classes, X_train):
     plt.show()
 
 #Plot number of images per class
-def histogram():
+def histogram(n_classes, y_train):
     plt.figure(figsize=(12, 4))
     plt.bar(range(0, n_classes), np.bincount(y_train))
     plt.title("Distribution of the train dataset")
@@ -69,13 +69,13 @@ def contr_img(img, s=1.0):
     return lin_img(img, s, m)
 
 def augment(img):
-    img = contr_img(img, 1.8*np.random.rand()+0.2)
+    # img = contr_img(img, 1.8*np.random.rand()+0.2)
     img = rotate_img(img)
     img = random_translate(img)
     return random_scaling(img)
 
 
-def dataAugmentation(X_train_normalize, y_train):
+def dataAugmentation(n_classes, X_train_normalize, y_train):
     print('X, y shapes:', X_train_normalize.shape, y_train.shape)
 
     for class_n in range(n_classes):

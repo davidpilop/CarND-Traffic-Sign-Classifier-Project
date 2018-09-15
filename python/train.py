@@ -21,10 +21,12 @@ from configparser import SafeConfigParser
 
 import tensorflow as tf
 
-from prepare_data import preprocess
+from prepare_data import preprocess, dataAugmentation, histogram, visualization
 from LeNet import LeNet
 from LeNet2 import LeNet2
-from Xception import Xception
+from LeNet3 import LeNet3
+from AllCNN32 import AllCNN32
+from helper import metrics
 
 # File hierarchy
 _python_dir      = dirname(os.path.abspath(__file__))
@@ -82,7 +84,7 @@ if not exists(_current_log_dir_files): mkdir(_current_log_dir_files)
 
 _out_log_file = open(join(_current_log_dir, 'trainning_results.txt'), 'a')
 
-os.system('cp ' + join(_python_dir,'LeNet.py') + ' %s' % (_current_log_dir_files))
+os.system('cp ' + join(_python_dir,'LeNet3.py') + ' %s' % (_current_log_dir_files))
 os.system('cp ' + join(_python_dir,'train.py') + ' %s' % (_current_log_dir_files))
 os.system('cp ' + join(_config_dir,'cfg_model.ini') + ' %s' % (_current_log_dir_files))
 
@@ -114,6 +116,10 @@ X_train_normalize = preprocess(X_train)
 X_valid_normalize = preprocess(X_valid)
 X_test_normalize = preprocess(X_test)
 
+# visualization(43, X_train, y_train)
+# histogram(43, y_train)
+# X_train_normalize, y_train = dataAugmentation(43, X_train_normalize, y_train)
+# histogram(43, y_train)
 
 # Write to file function
 def log_string(out_str):
@@ -171,38 +177,20 @@ def eval_one_epoch(sess, ops, writer, epoch, X_data, y_data):
                    ops['y']: batch_y,
                    ops['keep_prob']: 1.0,
                    ops['training']: False}
-        _, summary, step = sess.run([ops['accuracy'],
+        _, summary, step = sess.run([ops['NumelPreds_Total'],
                                      ops['merged'],
                                      ops['step']],
                                      feed_dict=feed_dict)
         writer.add_summary(summary, step)
     return
 
-def metrics(logits, one_hot_y):
-    '''
-    Accuracy of a given set of predictions of size (N x n_classes) and
-    labels of size (N x n_classes)
-    '''
-    correct_prediction = tf.cast(tf.equal(tf.argmax(logits, 1), tf.argmax(one_hot_y, 1)), tf.float32)
-    accuracy_operation = tf.reduce_mean(correct_prediction)
-    tf.summary.scalar('accuracy', accuracy_operation)
-    tf.metrics.mean_per_class_accuracy(
-        labels = one_hot_y,
-        predictions = logits,
-        num_classes = 43,
-        weights=None,
-        metrics_collections=None,
-        updates_collections=None,
-        name='accuracy_per_class')
-    return accuracy_operation
-
 def train():
     # Create a session
     sess = tf.Session(graph=tf.get_default_graph())
 
     x, y, keep_prob, one_hot_y, training = placeholder()
-    logits = LeNet2(x, keep_prob)
-    accuracyTotal = metrics(logits, one_hot_y)
+    logits = AllCNN32(x, keep_prob, training)
+    Intersection_Total, NumelPreds_Total = metrics(logits, y)
 
     global_step = tf.Variable(0, trainable=False)
     train_op = optimize(logits, one_hot_y, global_step)
@@ -220,8 +208,10 @@ def train():
         saver.restore(sess, check)
         log_string("Model restored.")
     else:
-        init = tf.global_variables_initializer()
-        sess.run(init)
+        init_g = tf.global_variables_initializer()
+        init_l = tf.local_variables_initializer()
+        sess.run(init_g)
+        sess.run(init_l)
 
     # Define TensorFlow operations
     ops = {'x': x,
@@ -232,7 +222,8 @@ def train():
            'step': global_step,
            'keep_prob': keep_prob,
            'training': training,
-           'accuracy': accuracyTotal}
+           'Intersection_Total': Intersection_Total,
+           'NumelPreds_Total': NumelPreds_Total}
 
     # Train and eval each epoch
     for epoch in range(_max_epoch):
@@ -242,7 +233,7 @@ def train():
         # Save model chekpoint to disk
         if epoch % 10 == 0:
             save_path = saver.save(sess, join(_current_log_dir_files, "model"))
-
+    
     # Save final state
     save_path = saver.save(sess, join(_current_log_dir_files, "model"))
     log_string("\nModel saved in file: %s" % save_path)
