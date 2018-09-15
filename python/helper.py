@@ -59,7 +59,7 @@ def metrics(nn_last_layer, correct_label):
 
             # Accuracy
             accuracy = safe_div(intersection, numelPreds)
-            tf.summary.scalar('accuracy/' + str(cls_id), accuracy)# TODO:CLASS2LABEL
+            tf.summary.scalar('accuracy_' + str(cls_id), accuracy)# TODO:CLASS2LABEL
 
             Intersection_Total.append(intersection)
             # NumelLabels_Total.append(numelLabels)

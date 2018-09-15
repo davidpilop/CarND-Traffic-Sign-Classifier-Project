@@ -82,7 +82,7 @@ mkdir(_current_log_dir)
 _current_log_dir_files = join(_current_log_dir, 'files')
 if not exists(_current_log_dir_files): mkdir(_current_log_dir_files)
 
-_out_log_file = open(join(_current_log_dir, 'trainning_results.txt'), 'a')
+_out_log_file = open(join(_current_log_dir, 'training_results.txt'), 'a')
 
 os.system('cp ' + join(_python_dir,'LeNet3.py') + ' %s' % (_current_log_dir_files))
 os.system('cp ' + join(_python_dir,'train.py') + ' %s' % (_current_log_dir_files))
@@ -241,4 +241,4 @@ def train():
 if __name__ == '__main__':
     train()
     _out_log_file.close()
-    copyfile(join(_current_log_dir, 'trainning_results.txt'), join(_proyect_dir,'trainning_results.txt'))
+    copyfile(join(_current_log_dir, 'training_results.txt'), join(_proyect_dir,'training_results.txt'))
