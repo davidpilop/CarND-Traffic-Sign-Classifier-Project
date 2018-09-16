@@ -25,6 +25,7 @@ from prepare_data import preprocess, dataAugmentation, histogram, visualization
 from LeNet import LeNet
 from LeNet2 import LeNet2
 from LeNet3 import LeNet3
+from LeNet4 import LeNet4
 from AllCNN32 import AllCNN32
 from helper import metrics
 
@@ -189,7 +190,7 @@ def train():
     sess = tf.Session(graph=tf.get_default_graph())
 
     x, y, keep_prob, one_hot_y, training = placeholder()
-    logits = AllCNN32(x, keep_prob, training)
+    logits = LeNet4(x, keep_prob, training)
     Intersection_Total, NumelPreds_Total = metrics(logits, y)
 
     global_step = tf.Variable(0, trainable=False)

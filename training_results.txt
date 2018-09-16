@@ -1,0 +1,2 @@
+
+Model saved in file: /home/david/CarND-Traffic-Sign-Classifier-Project/log/180915/LeNet4_group/files/model
